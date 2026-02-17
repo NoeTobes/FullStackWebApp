@@ -1,0 +1,86 @@
+/* Page visibility control */
+.page {
+    display: none;
+}
+
+.page.active {
+    display: block;
+}
+
+/* Role-based visibility */
+body.not-authenticated .role-logged-in {
+    display: none !important;
+}
+
+body.authenticated .role-logged-out {
+    display: none !important;
+}
+
+.role-admin {
+    display: none !important;
+}
+
+body.is-admin .role-admin {
+    display: block !important;
+}
+
+/* Dropdown items need special handling */
+body.is-admin .dropdown-item.role-admin {
+    display: block !important;
+}
+
+/* Nav items need inline-block for proper layout */
+body.is-admin .nav-item.role-admin {
+    display: inline-block !important;
+}
+
+/* Custom styles */
+.card {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.jumbotron {
+    padding: 2rem;
+    background-color: #f8f9fa;
+    border-radius: 0.3rem;
+    margin-bottom: 2rem;
+}
+
+/* Table responsiveness */
+.table-responsive {
+    margin-top: 1rem;
+}
+
+/* Loading state */
+.loading {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+/* Toast notifications */
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+}
+
+.toast {
+    min-width: 250px;
+}
+
+/* Form validation styles */
+.form-control.is-invalid {
+    border-color: #dc3545;
+}
+
+.invalid-feedback {
+    display: none;
+    color: #dc3545;
+    font-size: 0.875rem;
+}
+
+.form-control.is-invalid + .invalid-feedback {
+    display: block;
+}
