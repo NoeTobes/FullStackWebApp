@@ -1,0 +1,2028 @@
+// Global variables
+let currentUser = null;
+const STORAGE_KEY = 'ipt_demo_v1';
+
+// Database structure
+window.db = {
+    accounts: [],
+    departments: [],
+    employees: [],
+    requests: []
+};
+
+// Route configuration
+const routes = {
+    '/': 'home-page',
+    '/register': 'register-page',
+    '/verify-email': 'verify-email-page',
+    '/login': 'login-page',
+    '/profile': 'profile-page',
+    '/employees': 'employees-page',
+    '/departments': 'departments-page',
+    '/accounts': 'accounts-page',
+    '/requests': 'requests-page'
+};
+
+// Protected routes (require authentication)
+const protectedRoutes = ['/profile', '/requests'];
+
+// Admin routes (require admin role)
+const adminRoutes = ['/employees', '/departments', '/accounts'];
+
+// Initialize the application
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('App initialized');
+    
+    // Set initial hash if empty
+    if (!window.location.hash || window.location.hash === '#') {
+        window.location.hash = '#/';
+    }
+    
+    // Load data from localStorage
+    loadFromStorage();
+    
+    // Add hash change listener
+    window.addEventListener('hashchange', handleRouting);
+    
+    // Initial routing
+    handleRouting();
+    
+    // Setup form listeners
+    setupFormListeners();
+    
+    // Setup navigation links
+    setupNavigationLinks();
+    
+    // Check for existing session
+    checkExistingSession();
+    
+    // Log storage status
+    logStorageStatus();
+});
+
+// Load data from localStorage
+function loadFromStorage() {
+    try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        
+        if (stored) {
+            const parsedData = JSON.parse(stored);
+            
+            // Validate the structure of loaded data
+            if (isValidDbStructure(parsedData)) {
+                window.db = parsedData;
+                console.log('✅ Data loaded successfully from storage');
+            } else {
+                console.error('❌ Invalid data structure in storage, reseeding...');
+                seedDefaultData();
+            }
+        } else {
+            console.log('ℹ️ No existing data found, seeding with defaults');
+            seedDefaultData();
+        }
+    } catch (e) {
+        console.error('❌ Failed to parse stored data:', e);
+        showNotification('Storage corruption detected. Resetting data...', 'warning');
+        seedDefaultData();
+    }
+}
+
+// Validate database structure
+function isValidDbStructure(data) {
+    // Check if data has all required collections
+    const requiredCollections = ['accounts', 'departments', 'employees', 'requests'];
+    
+    for (const collection of requiredCollections) {
+        if (!Array.isArray(data[collection])) {
+            console.error(`Missing or invalid collection: ${collection}`);
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+// Seed default data with enhanced structure
+function seedDefaultData() {
+    const now = new Date().toISOString();
+    
+    window.db = {
+        accounts: [
+            {
+                id: 1,
+                firstName: 'Admin',
+                lastName: 'User',
+                email: 'admin@example.com',
+                password: 'Password123!',
+                role: 'admin',
+                verified: true,
+                createdAt: now,
+                lastLogin: null,
+                phone: '+1 (555) 123-4567',
+                department: 'Management',
+                position: 'System Administrator',
+                bio: 'Experienced system administrator with over 10 years in IT infrastructure.'
+            },
+            {
+                id: 2,
+                firstName: 'John',
+                lastName: 'Doe',
+                email: 'user@example.com',
+                password: 'user123',
+                role: 'user',
+                verified: true,
+                createdAt: now,
+                lastLogin: null,
+                phone: '+1 (555) 987-6543',
+                department: 'Engineering',
+                position: 'Software Developer',
+                bio: 'Full-stack developer passionate about creating elegant web applications.'
+            },
+            {
+                id: 3,
+                firstName: 'Jane',
+                lastName: 'Smith',
+                email: 'jane@example.com',
+                password: 'jane123',
+                role: 'user',
+                verified: false,
+                createdAt: now,
+                lastLogin: null,
+                phone: '',
+                department: '',
+                position: '',
+                bio: ''
+            }
+        ],
+        departments: [
+            {
+                id: 1,
+                name: 'Engineering',
+                description: 'Software development and engineering',
+                createdAt: now,
+                updatedAt: now
+            },
+            {
+                id: 2,
+                name: 'Human Resources',
+                description: 'HR and personnel management',
+                createdAt: now,
+                updatedAt: now
+            },
+            {
+                id: 3,
+                name: 'Marketing',
+                description: 'Marketing and communications',
+                createdAt: now,
+                updatedAt: now
+            },
+            {
+                id: 4,
+                name: 'Sales',
+                description: 'Sales and business development',
+                createdAt: now,
+                updatedAt: now
+            },
+            {
+                id: 5,
+                name: 'Management',
+                description: 'Executive management',
+                createdAt: now,
+                updatedAt: now
+            }
+        ],
+        employees: [
+            {
+                id: 1,
+                employeeId: 'EMP001',
+                userId: 2,
+                position: 'Software Developer',
+                departmentId: 1,
+                hireDate: '2024-01-15',
+                status: 'active',
+                createdAt: now,
+                updatedAt: now
+            }
+        ],
+        requests: [
+            {
+                id: 1,
+                type: 'Leave',
+                items: [
+                    { name: 'Annual Leave', quantity: 5 }
+                ],
+                status: 'Pending',
+                employeeEmail: 'user@example.com',
+                createdAt: now,
+                updatedAt: now
+            }
+        ]
+    };
+    
+    saveToStorage();
+    console.log('✅ Default data seeded successfully');
+}
+
+// Save to localStorage with error handling
+function saveToStorage() {
+    try {
+        // Add metadata to the saved data
+        const dataToSave = {
+            ...window.db,
+            _metadata: {
+                lastSaved: new Date().toISOString(),
+                version: '1.0',
+                recordCounts: {
+                    accounts: window.db.accounts.length,
+                    departments: window.db.departments.length,
+                    employees: window.db.employees.length,
+                    requests: window.db.requests.length
+                }
+            }
+        };
+        
+        const serializedData = JSON.stringify(dataToSave);
+        localStorage.setItem(STORAGE_KEY, serializedData);
+        console.log('✅ Data saved to storage');
+        
+    } catch (e) {
+        console.error('❌ Failed to save to storage:', e);
+        showNotification('Failed to save data: ' + e.message, 'danger');
+    }
+}
+
+// Navigation function
+function navigateTo(path) {
+    window.location.hash = '#' + path;
+}
+
+// Handle routing logic
+function handleRouting() {
+    // Get the current hash path (remove the '#' character)
+    let hash = window.location.hash.slice(1) || '/';
+    
+    // Handle empty hash or just '#'
+    if (hash === '') {
+        hash = '/';
+    }
+    
+    console.log('Navigating to:', hash);
+    
+    // Get the route path (remove any query parameters)
+    const path = hash.split('?')[0];
+    
+    // Check if route exists, otherwise default to home
+    const pageId = routes[path] || 'home-page';
+    
+    // Check authentication for protected routes
+    if (protectedRoutes.includes(path)) {
+        if (!isAuthenticated()) {
+            console.log('Unauthorized access to protected route, redirecting to login');
+            showNotification('Please login to access this page', 'warning');
+            navigateTo('/login');
+            return;
+        }
+    }
+    
+    // Check admin routes
+    if (adminRoutes.includes(path)) {
+        if (!isAdmin()) {
+            console.log('Unauthorized access to admin route, redirecting to home');
+            showNotification('Access denied. Admin privileges required.', 'danger');
+            navigateTo('/');
+            return;
+        }
+    }
+    
+    // Special handling for verify email page
+    if (path === '/verify-email') {
+        const unverifiedEmail = localStorage.getItem('unverified_email');
+        if (!unverifiedEmail) {
+            showNotification('No pending verification found', 'warning');
+            navigateTo('/register');
+            return;
+        }
+    }
+    
+    // Update active page
+    showPage(pageId);
+    
+    // Update navigation active state
+    updateActiveNavLink(path);
+    
+    // Update page title
+    updatePageTitle(pageId);
+    
+    // Trigger page-specific rendering
+    renderPageContent(pageId);
+}
+
+// Check if user is authenticated
+function isAuthenticated() {
+    return currentUser !== null;
+}
+
+// Check if user is admin
+function isAdmin() {
+    return currentUser && currentUser.role === 'admin';
+}
+
+// Show a specific page
+function showPage(pageId) {
+    // Hide all pages
+    document.querySelectorAll('.page').forEach(page => {
+        page.classList.remove('active');
+    });
+    
+    // Show the target page
+    const targetPage = document.getElementById(pageId);
+    if (targetPage) {
+        targetPage.classList.add('active');
+    } else {
+        console.error('Page not found:', pageId);
+        // Fallback to home page
+        const homePage = document.getElementById('home-page');
+        if (homePage) {
+            homePage.classList.add('active');
+        }
+    }
+}
+
+// Update active navigation link
+function updateActiveNavLink(path) {
+    // Remove active class from all nav links
+    document.querySelectorAll('.navbar-nav .nav-link').forEach(link => {
+        link.classList.remove('active');
+    });
+    
+    // Add active class to current link
+    document.querySelectorAll('.navbar-nav .nav-link').forEach(link => {
+        const href = link.getAttribute('href');
+        if (href === '#' + path || href === '#/' + path) {
+            link.classList.add('active');
+        }
+    });
+}
+
+// Update page title
+function updatePageTitle(pageId) {
+    const titles = {
+        'home-page': 'Home',
+        'register-page': 'Register',
+        'verify-email-page': 'Verify Email',
+        'login-page': 'Login',
+        'profile-page': 'Profile',
+        'employees-page': 'Employees',
+        'departments-page': 'Departments',
+        'accounts-page': 'Accounts',
+        'requests-page': 'My Requests'
+    };
+    
+    const pageName = titles[pageId] || 'Full-Stack App';
+    document.title = `${pageName} - Full-Stack App (Student Build)`;
+}
+
+// Render page-specific content
+function renderPageContent(pageId) {
+    switch (pageId) {
+        case 'profile-page':
+            renderProfilePage();
+            break;
+        case 'employees-page':
+            renderEmployeesPage();
+            break;
+        case 'departments-page':
+            renderDepartmentsPage();
+            break;
+        case 'accounts-page':
+            renderAccountsPage();
+            break;
+        case 'requests-page':
+            renderRequestsPage();
+            break;
+        case 'verify-email-page':
+            renderVerifyEmailPage();
+            break;
+    }
+}
+
+// ==================== PROFILE PAGE (Phase 5) ====================
+
+function renderProfilePage() {
+    if (!currentUser) return;
+    
+    const profileContainer = document.querySelector('#profile-page .row');
+    
+    // Create enhanced profile layout
+    profileContainer.innerHTML = `
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Profile Information</h4>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-4">
+                        <div class="avatar-circle mb-3">
+                            <span class="avatar-initials">${getInitials(currentUser)}</span>
+                        </div>
+                        <h5 id="profile-name">${currentUser.firstName} ${currentUser.lastName}</h5>
+                        <p class="text-muted mb-1" id="profile-email">${currentUser.email}</p>
+                        <span class="badge bg-${currentUser.role === 'admin' ? 'danger' : 'info'} mb-2" id="profile-role">
+                            ${currentUser.role === 'admin' ? 'Administrator' : 'User'}
+                        </span>
+                    </div>
+                    
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-telephone"></i> Phone:</span>
+                            <span id="profile-phone">${currentUser.phone || 'Not set'}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-building"></i> Department:</span>
+                            <span id="profile-dept">${currentUser.department || 'Not set'}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-briefcase"></i> Position:</span>
+                            <span id="profile-position">${currentUser.position || 'Not set'}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-calendar"></i> Member since:</span>
+                            <span id="profile-created">${formatDate(currentUser.createdAt)}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-clock-history"></i> Last login:</span>
+                            <span id="profile-lastlogin">${currentUser.lastLogin ? formatDate(currentUser.lastLogin) : 'First visit'}</span>
+                        </li>
+                    </ul>
+                    
+                    <div class="d-grid gap-2 mt-3">
+                        <button class="btn btn-primary" id="edit-profile-btn">
+                            <i class="bi bi-pencil"></i> Edit Profile
+                        </button>
+                        <button class="btn btn-outline-secondary" id="change-password-btn">
+                            <i class="bi bi-key"></i> Change Password
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-8">
+            <div class="card mb-3">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="bi bi-chat"></i> Bio</h5>
+                </div>
+                <div class="card-body">
+                    <p id="profile-bio">${currentUser.bio || 'No bio provided yet.'}</p>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="bi bi-activity"></i> Recent Activity</h5>
+                </div>
+                <div class="card-body">
+                    <div id="recent-activity">
+                        ${renderRecentActivity()}
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Add edit profile modal if it doesn't exist
+    addEditProfileModal();
+    
+    // Add change password modal if it doesn't exist
+    addChangePasswordModal();
+    
+    // Re-attach event listeners
+    document.getElementById('edit-profile-btn').addEventListener('click', showEditProfileModal);
+    document.getElementById('change-password-btn').addEventListener('click', showChangePasswordModal);
+}
+
+// Get user initials for avatar
+function getInitials(user) {
+    return (user.firstName.charAt(0) + user.lastName.charAt(0)).toUpperCase();
+}
+
+// Format date nicely
+function formatDate(dateString) {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+// Render recent activity
+function renderRecentActivity() {
+    if (!currentUser) return '<p class="text-muted">No recent activity</p>';
+    
+    // Get user's recent requests
+    const userRequests = window.db.requests
+        .filter(r => r.employeeEmail === currentUser.email)
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, 5);
+    
+    if (userRequests.length === 0) {
+        return '<p class="text-muted">No recent activity found</p>';
+    }
+    
+    let html = '<div class="list-group">';
+    userRequests.forEach(req => {
+        const statusClass = {
+            'Pending': 'warning',
+            'Approved': 'success',
+            'Rejected': 'danger'
+        }[req.status] || 'secondary';
+        
+        html += `
+            <div class="list-group-item">
+                <div class="d-flex w-100 justify-content-between">
+                    <h6 class="mb-1">${req.type} Request</h6>
+                    <small class="text-muted">${formatDate(req.createdAt)}</small>
+                </div>
+                <p class="mb-1">${req.items.length} item(s) requested</p>
+                <small><span class="badge bg-${statusClass}">${req.status}</span></small>
+            </div>
+        `;
+    });
+    html += '</div>';
+    
+    return html;
+}
+
+// Add edit profile modal to DOM
+function addEditProfileModal() {
+    if (document.getElementById('editProfileModal')) return;
+    
+    const modalHTML = `
+        <div class="modal fade" id="editProfileModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title">Edit Profile</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="edit-profile-form">
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="edit-firstname" class="form-label">First Name</label>
+                                    <input type="text" class="form-control" id="edit-firstname" value="${currentUser.firstName}" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="edit-lastname" class="form-label">Last Name</label>
+                                    <input type="text" class="form-control" id="edit-lastname" value="${currentUser.lastName}" required>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="edit-phone" class="form-label">Phone Number</label>
+                                <input type="tel" class="form-control" id="edit-phone" value="${currentUser.phone || ''}">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="edit-department" class="form-label">Department</label>
+                                <select class="form-select" id="edit-department">
+                                    <option value="">Select Department</option>
+                                    ${window.db.departments.map(d => 
+                                        `<option value="${d.name}" ${currentUser.department === d.name ? 'selected' : ''}>${d.name}</option>`
+                                    ).join('')}
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="edit-position" class="form-label">Position</label>
+                                <input type="text" class="form-control" id="edit-position" value="${currentUser.position || ''}">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="edit-bio" class="form-label">Bio</label>
+                                <textarea class="form-control" id="edit-bio" rows="3">${currentUser.bio || ''}</textarea>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="save-profile-btn">Save Changes</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // Add event listener for save button
+    document.getElementById('save-profile-btn').addEventListener('click', saveProfileChanges);
+}
+
+// Add change password modal
+function addChangePasswordModal() {
+    if (document.getElementById('changePasswordModal')) return;
+    
+    const modalHTML = `
+        <div class="modal fade" id="changePasswordModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-warning text-white">
+                        <h5 class="modal-title">Change Password</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="change-password-form">
+                            <div class="mb-3">
+                                <label for="current-password" class="form-label">Current Password</label>
+                                <input type="password" class="form-control" id="current-password" required>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="new-password" class="form-label">New Password</label>
+                                <input type="password" class="form-control" id="new-password" minlength="6" required>
+                                <small class="text-muted">Minimum 6 characters</small>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="confirm-password" class="form-label">Confirm New Password</label>
+                                <input type="password" class="form-control" id="confirm-password" minlength="6" required>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-warning" id="save-password-btn">Update Password</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // Add event listener for save button
+    document.getElementById('save-password-btn').addEventListener('click', savePasswordChanges);
+}
+
+// Show edit profile modal
+function showEditProfileModal() {
+    const modal = new bootstrap.Modal(document.getElementById('editProfileModal'));
+    modal.show();
+}
+
+// Show change password modal
+function showChangePasswordModal() {
+    const modal = new bootstrap.Modal(document.getElementById('changePasswordModal'));
+    modal.show();
+}
+
+// Save profile changes
+function saveProfileChanges() {
+    // Get form values
+    const firstName = document.getElementById('edit-firstname').value.trim();
+    const lastName = document.getElementById('edit-lastname').value.trim();
+    const phone = document.getElementById('edit-phone').value.trim();
+    const department = document.getElementById('edit-department').value;
+    const position = document.getElementById('edit-position').value.trim();
+    const bio = document.getElementById('edit-bio').value.trim();
+    
+    // Validate
+    if (!firstName || !lastName) {
+        showNotification('First name and last name are required', 'warning');
+        return;
+    }
+    
+    // Update current user object
+    currentUser.firstName = firstName;
+    currentUser.lastName = lastName;
+    currentUser.phone = phone;
+    currentUser.department = department;
+    currentUser.position = position;
+    currentUser.bio = bio;
+    
+    // Update in database
+    const accountIndex = window.db.accounts.findIndex(a => a.id === currentUser.id);
+    if (accountIndex !== -1) {
+        window.db.accounts[accountIndex] = { ...currentUser };
+        saveToStorage();
+        
+        // Update username in navbar
+        document.getElementById('username-display').textContent = `${firstName} ${lastName}`;
+        
+        // Close modal
+        bootstrap.Modal.getInstance(document.getElementById('editProfileModal')).hide();
+        
+        // Refresh profile page
+        renderProfilePage();
+        
+        showNotification('Profile updated successfully!', 'success');
+    }
+}
+
+// Save password changes
+function savePasswordChanges() {
+    const currentPassword = document.getElementById('current-password').value;
+    const newPassword = document.getElementById('new-password').value;
+    const confirmPassword = document.getElementById('confirm-password').value;
+    
+    // Validate
+    if (!currentPassword || !newPassword || !confirmPassword) {
+        showNotification('All fields are required', 'warning');
+        return;
+    }
+    
+    if (newPassword.length < 6) {
+        showNotification('New password must be at least 6 characters', 'warning');
+        return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+        showNotification('New passwords do not match', 'danger');
+        return;
+    }
+    
+    // Verify current password
+    if (currentPassword !== currentUser.password) {
+        showNotification('Current password is incorrect', 'danger');
+        return;
+    }
+    
+    // Update password
+    currentUser.password = newPassword;
+    
+    // Update in database
+    const accountIndex = window.db.accounts.findIndex(a => a.id === currentUser.id);
+    if (accountIndex !== -1) {
+        window.db.accounts[accountIndex].password = newPassword;
+        saveToStorage();
+        
+        // Close modal
+        bootstrap.Modal.getInstance(document.getElementById('changePasswordModal')).hide();
+        
+        // Clear form
+        document.getElementById('change-password-form').reset();
+        
+        showNotification('Password updated successfully!', 'success');
+    }
+}
+
+// ==================== ACCOUNTS PAGE (Admin CRUD) ====================
+
+function renderAccountsPage() {
+    // Add Accounts Management Modal if it doesn't exist
+    addAccountModal();
+    
+    const tbody = document.getElementById('accounts-table-body');
+    
+    if (window.db.accounts.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center">No accounts found</td></tr>';
+    } else {
+        let html = '';
+        window.db.accounts.forEach(account => {
+            html += `
+                <tr>
+                    <td>${account.firstName} ${account.lastName}</td>
+                    <td>${account.email}</td>
+                    <td>
+                        <select class="form-select form-select-sm role-select" data-id="${account.id}" ${account.id === currentUser?.id ? 'disabled' : ''}>
+                            <option value="user" ${account.role === 'user' ? 'selected' : ''}>User</option>
+                            <option value="admin" ${account.role === 'admin' ? 'selected' : ''}>Admin</option>
+                        </select>
+                    </td>
+                    <td>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input verified-toggle" type="checkbox" data-id="${account.id}" ${account.verified ? 'checked' : ''} ${account.id === currentUser?.id ? 'disabled' : ''}>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="badge bg-${account.verified ? 'success' : 'warning'}">${account.verified ? 'Verified' : 'Pending'}</span>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-warning" onclick="editAccount(${account.id})">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteAccount(${account.id})" ${account.id === currentUser?.id ? 'disabled' : ''}>
+                            <i class="bi bi-trash"></i>
+                        </button>
+                        <button class="btn btn-sm btn-secondary" onclick="resetPassword(${account.id})" ${account.id === currentUser?.id ? 'disabled' : ''}>
+                            <i class="bi bi-key"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+        tbody.innerHTML = html;
+        
+        // Add event listeners for role selects and verified toggles
+        document.querySelectorAll('.role-select').forEach(select => {
+            select.addEventListener('change', function(e) {
+                updateAccountRole(this.dataset.id, this.value);
+            });
+        });
+        
+        document.querySelectorAll('.verified-toggle').forEach(toggle => {
+            toggle.addEventListener('change', function(e) {
+                updateAccountVerified(this.dataset.id, this.checked);
+            });
+        });
+    }
+    
+    // Update add account button listener
+    document.getElementById('add-account-btn').onclick = () => showAccountModal('add');
+}
+
+// Add Account Modal
+function addAccountModal() {
+    if (document.getElementById('accountModal')) return;
+    
+    const modalHTML = `
+        <div class="modal fade" id="accountModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title" id="accountModalTitle">Add Account</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="account-form">
+                            <input type="hidden" id="account-id">
+                            
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="account-firstname" class="form-label">First Name</label>
+                                    <input type="text" class="form-control" id="account-firstname" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="account-lastname" class="form-label">Last Name</label>
+                                    <input type="text" class="form-control" id="account-lastname" required>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="account-email" class="form-label">Email</label>
+                                <input type="email" class="form-control" id="account-email" required>
+                            </div>
+                            
+                            <div class="mb-3" id="password-field">
+                                <label for="account-password" class="form-label">Password</label>
+                                <input type="password" class="form-control" id="account-password" minlength="6">
+                                <small class="text-muted">Minimum 6 characters. Leave blank to keep current password when editing.</small>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="account-phone" class="form-label">Phone</label>
+                                <input type="tel" class="form-control" id="account-phone">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="account-department" class="form-label">Department</label>
+                                <select class="form-select" id="account-department">
+                                    <option value="">Select Department</option>
+                                    ${window.db.departments.map(d => 
+                                        `<option value="${d.name}">${d.name}</option>`
+                                    ).join('')}
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="account-position" class="form-label">Position</label>
+                                <input type="text" class="form-control" id="account-position">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="account-bio" class="form-label">Bio</label>
+                                <textarea class="form-control" id="account-bio" rows="2"></textarea>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="account-role" value="admin">
+                                        <label class="form-check-label" for="account-role">
+                                            Admin Role
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="account-verified" checked>
+                                        <label class="form-check-label" for="account-verified">
+                                            Verified
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="save-account-btn">Save Account</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Reset Password Modal -->
+        <div class="modal fade" id="resetPasswordModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-warning text-white">
+                        <h5 class="modal-title">Reset Password</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="reset-password-form">
+                            <input type="hidden" id="reset-password-account-id">
+                            <div class="mb-3">
+                                <label for="new-password" class="form-label">New Password</label>
+                                <input type="password" class="form-control" id="reset-new-password" minlength="6" required>
+                                <small class="text-muted">Minimum 6 characters</small>
+                            </div>
+                            <div class="mb-3">
+                                <label for="confirm-new-password" class="form-label">Confirm New Password</label>
+                                <input type="password" class="form-control" id="confirm-new-password" minlength="6" required>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-warning" id="save-reset-password-btn">Reset Password</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // Add event listeners
+    document.getElementById('save-account-btn').addEventListener('click', saveAccount);
+    document.getElementById('save-reset-password-btn').addEventListener('click', saveResetPassword);
+}
+
+// Show account modal for add/edit
+function showAccountModal(action, accountId = null) {
+    const modalTitle = document.getElementById('accountModalTitle');
+    const passwordField = document.getElementById('password-field');
+    const form = document.getElementById('account-form');
+    
+    if (action === 'add') {
+        modalTitle.textContent = 'Add Account';
+        passwordField.style.display = 'block';
+        document.getElementById('account-password').required = true;
+        form.reset();
+        document.getElementById('account-id').value = '';
+    } else {
+        modalTitle.textContent = 'Edit Account';
+        passwordField.style.display = 'none';
+        document.getElementById('account-password').required = false;
+        
+        // Load account data
+        const account = window.db.accounts.find(a => a.id === accountId);
+        if (account) {
+            document.getElementById('account-id').value = account.id;
+            document.getElementById('account-firstname').value = account.firstName;
+            document.getElementById('account-lastname').value = account.lastName;
+            document.getElementById('account-email').value = account.email;
+            document.getElementById('account-phone').value = account.phone || '';
+            document.getElementById('account-department').value = account.department || '';
+            document.getElementById('account-position').value = account.position || '';
+            document.getElementById('account-bio').value = account.bio || '';
+            document.getElementById('account-role').checked = account.role === 'admin';
+            document.getElementById('account-verified').checked = account.verified;
+        }
+    }
+    
+    const modal = new bootstrap.Modal(document.getElementById('accountModal'));
+    modal.show();
+}
+
+// Save account (add or update)
+function saveAccount() {
+    const accountId = document.getElementById('account-id').value;
+    const firstName = document.getElementById('account-firstname').value.trim();
+    const lastName = document.getElementById('account-lastname').value.trim();
+    const email = document.getElementById('account-email').value.trim();
+    const password = document.getElementById('account-password').value;
+    const phone = document.getElementById('account-phone').value.trim();
+    const department = document.getElementById('account-department').value;
+    const position = document.getElementById('account-position').value.trim();
+    const bio = document.getElementById('account-bio').value.trim();
+    const isAdmin = document.getElementById('account-role').checked;
+    const isVerified = document.getElementById('account-verified').checked;
+    
+    // Validate
+    if (!firstName || !lastName || !email) {
+        showNotification('Please fill in required fields', 'warning');
+        return;
+    }
+    
+    if (!isValidEmail(email)) {
+        showNotification('Please enter a valid email', 'warning');
+        return;
+    }
+    
+    if (!accountId && password.length < 6) {
+        showNotification('Password must be at least 6 characters', 'warning');
+        return;
+    }
+    
+    if (accountId) {
+        // Update existing account
+        const index = window.db.accounts.findIndex(a => a.id === parseInt(accountId));
+        if (index !== -1) {
+            window.db.accounts[index] = {
+                ...window.db.accounts[index],
+                firstName,
+                lastName,
+                email: email.toLowerCase(),
+                phone,
+                department,
+                position,
+                bio,
+                role: isAdmin ? 'admin' : 'user',
+                verified: isVerified
+            };
+            
+            // Update password if provided
+            if (password) {
+                window.db.accounts[index].password = password;
+            }
+            
+            saveToStorage();
+            showNotification('Account updated successfully', 'success');
+        }
+    } else {
+        // Check if email already exists
+        if (window.db.accounts.some(a => a.email.toLowerCase() === email.toLowerCase())) {
+            showNotification('Email already exists', 'danger');
+            return;
+        }
+        
+        // Create new account
+        const newAccount = {
+            id: generateId(),
+            firstName,
+            lastName,
+            email: email.toLowerCase(),
+            password: password,
+            role: isAdmin ? 'admin' : 'user',
+            verified: isVerified,
+            createdAt: new Date().toISOString(),
+            lastLogin: null,
+            phone,
+            department,
+            position,
+            bio
+        };
+        
+        window.db.accounts.push(newAccount);
+        saveToStorage();
+        showNotification('Account created successfully', 'success');
+    }
+    
+    // Close modal and refresh
+    bootstrap.Modal.getInstance(document.getElementById('accountModal')).hide();
+    renderAccountsPage();
+}
+
+// Update account role via dropdown
+function updateAccountRole(accountId, newRole) {
+    const account = window.db.accounts.find(a => a.id === parseInt(accountId));
+    if (account) {
+        account.role = newRole;
+        saveToStorage();
+        showNotification(`Role updated for ${account.email}`, 'success');
+    }
+}
+
+// Update account verified status via toggle
+function updateAccountVerified(accountId, verified) {
+    const account = window.db.accounts.find(a => a.id === parseInt(accountId));
+    if (account) {
+        account.verified = verified;
+        saveToStorage();
+        renderAccountsPage(); // Refresh to update badge
+        showNotification(`Verification status updated for ${account.email}`, 'success');
+    }
+}
+
+// Edit account (show modal)
+function editAccount(accountId) {
+    showAccountModal('edit', parseInt(accountId));
+}
+
+// Delete account
+function deleteAccount(accountId) {
+    accountId = parseInt(accountId);
+    
+    // Prevent self-deletion
+    if (accountId === currentUser?.id) {
+        showNotification('You cannot delete your own account!', 'danger');
+        return;
+    }
+    
+    const account = window.db.accounts.find(a => a.id === accountId);
+    
+    if (confirm(`Are you sure you want to delete the account for ${account?.email}?`)) {
+        window.db.accounts = window.db.accounts.filter(a => a.id !== accountId);
+        
+        // Also remove any associated employees
+        window.db.employees = window.db.employees.filter(e => e.userId !== accountId);
+        
+        saveToStorage();
+        renderAccountsPage();
+        showNotification('Account deleted successfully', 'success');
+    }
+}
+
+// Reset password
+function resetPassword(accountId) {
+    document.getElementById('reset-password-account-id').value = accountId;
+    document.getElementById('reset-new-password').value = '';
+    document.getElementById('confirm-new-password').value = '';
+    
+    const modal = new bootstrap.Modal(document.getElementById('resetPasswordModal'));
+    modal.show();
+}
+
+// Save reset password
+function saveResetPassword() {
+    const accountId = parseInt(document.getElementById('reset-password-account-id').value);
+    const newPassword = document.getElementById('reset-new-password').value;
+    const confirmPassword = document.getElementById('confirm-new-password').value;
+    
+    if (!newPassword || !confirmPassword) {
+        showNotification('Please fill in all fields', 'warning');
+        return;
+    }
+    
+    if (newPassword.length < 6) {
+        showNotification('Password must be at least 6 characters', 'warning');
+        return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+        showNotification('Passwords do not match', 'danger');
+        return;
+    }
+    
+    const account = window.db.accounts.find(a => a.id === accountId);
+    if (account) {
+        account.password = newPassword;
+        saveToStorage();
+        
+        bootstrap.Modal.getInstance(document.getElementById('resetPasswordModal')).hide();
+        showNotification(`Password reset successfully for ${account.email}`, 'success');
+    }
+}
+
+// ==================== DEPARTMENTS PAGE (Admin CRUD) ====================
+
+function renderDepartmentsPage() {
+    // Add Departments Modal if it doesn't exist
+    addDepartmentModal();
+    
+    const tbody = document.getElementById('departments-table-body');
+    
+    if (window.db.departments.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" class="text-center">No departments found</td></tr>';
+    } else {
+        let html = '';
+        window.db.departments.forEach(dept => {
+            html += `
+                <tr>
+                    <td>${dept.name}</td>
+                    <td>${dept.description}</td>
+                    <td>
+                        <button class="btn btn-sm btn-warning" onclick="editDepartment(${dept.id})">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteDepartment(${dept.id})">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+        tbody.innerHTML = html;
+    }
+    
+    // Update add department button listener
+    document.getElementById('add-department-btn').onclick = () => showDepartmentModal('add');
+}
+
+// Add Department Modal
+function addDepartmentModal() {
+    if (document.getElementById('departmentModal')) return;
+    
+    const modalHTML = `
+        <div class="modal fade" id="departmentModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title" id="departmentModalTitle">Add Department</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="department-form">
+                            <input type="hidden" id="department-id">
+                            
+                            <div class="mb-3">
+                                <label for="department-name" class="form-label">Department Name</label>
+                                <input type="text" class="form-control" id="department-name" required>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="department-description" class="form-label">Description</label>
+                                <textarea class="form-control" id="department-description" rows="3" required></textarea>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="save-department-btn">Save Department</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // Add event listener
+    document.getElementById('save-department-btn').addEventListener('click', saveDepartment);
+}
+
+// Show department modal for add/edit
+function showDepartmentModal(action, departmentId = null) {
+    const modalTitle = document.getElementById('departmentModalTitle');
+    const form = document.getElementById('department-form');
+    
+    if (action === 'add') {
+        modalTitle.textContent = 'Add Department';
+        form.reset();
+        document.getElementById('department-id').value = '';
+    } else {
+        modalTitle.textContent = 'Edit Department';
+        
+        // Load department data
+        const dept = window.db.departments.find(d => d.id === departmentId);
+        if (dept) {
+            document.getElementById('department-id').value = dept.id;
+            document.getElementById('department-name').value = dept.name;
+            document.getElementById('department-description').value = dept.description;
+        }
+    }
+    
+    const modal = new bootstrap.Modal(document.getElementById('departmentModal'));
+    modal.show();
+}
+
+// Save department (add or update)
+function saveDepartment() {
+    const deptId = document.getElementById('department-id').value;
+    const name = document.getElementById('department-name').value.trim();
+    const description = document.getElementById('department-description').value.trim();
+    
+    if (!name || !description) {
+        showNotification('Please fill in all fields', 'warning');
+        return;
+    }
+    
+    const now = new Date().toISOString();
+    
+    if (deptId) {
+        // Update existing department
+        const index = window.db.departments.findIndex(d => d.id === parseInt(deptId));
+        if (index !== -1) {
+            window.db.departments[index] = {
+                ...window.db.departments[index],
+                name,
+                description,
+                updatedAt: now
+            };
+            showNotification('Department updated successfully', 'success');
+        }
+    } else {
+        // Create new department
+        const newDept = {
+            id: generateId(),
+            name,
+            description,
+            createdAt: now,
+            updatedAt: now
+        };
+        
+        window.db.departments.push(newDept);
+        showNotification('Department created successfully', 'success');
+    }
+    
+    saveToStorage();
+    
+    // Close modal and refresh
+    bootstrap.Modal.getInstance(document.getElementById('departmentModal')).hide();
+    renderDepartmentsPage();
+}
+
+// Edit department
+function editDepartment(departmentId) {
+    showDepartmentModal('edit', parseInt(departmentId));
+}
+
+// Delete department
+function deleteDepartment(departmentId) {
+    departmentId = parseInt(departmentId);
+    
+    // Check if department is in use
+    const isInUse = window.db.employees.some(e => e.departmentId === departmentId);
+    
+    if (isInUse) {
+        if (!confirm('This department has employees assigned. Deleting it will remove their department assignment. Continue?')) {
+            return;
+        }
+        // Remove department from employees
+        window.db.employees.forEach(e => {
+            if (e.departmentId === departmentId) {
+                e.departmentId = null;
+            }
+        });
+    }
+    
+    if (confirm('Are you sure you want to delete this department?')) {
+        window.db.departments = window.db.departments.filter(d => d.id !== departmentId);
+        saveToStorage();
+        renderDepartmentsPage();
+        showNotification('Department deleted successfully', 'success');
+    }
+}
+
+// ==================== EMPLOYEES PAGE (Admin CRUD) ====================
+
+function renderEmployeesPage() {
+    // Add Employee Modal if it doesn't exist
+    addEmployeeModal();
+    
+    const tbody = document.getElementById('employees-table-body');
+    
+    if (window.db.employees.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center">No employees found</td></tr>';
+    } else {
+        let html = '';
+        window.db.employees.forEach(emp => {
+            const user = window.db.accounts.find(a => a.id === emp.userId);
+            const dept = window.db.departments.find(d => d.id === emp.departmentId);
+            html += `
+                <tr>
+                    <td>${emp.employeeId}</td>
+                    <td>${user ? `${user.firstName} ${user.lastName}` : 'Unknown'}<br>
+                        <small class="text-muted">${user ? user.email : ''}</small>
+                    </td>
+                    <td>${emp.position}</td>
+                    <td>${dept ? dept.name : 'Unassigned'}</td>
+                    <td>
+                        <select class="form-select form-select-sm status-select" data-id="${emp.id}">
+                            <option value="active" ${emp.status === 'active' ? 'selected' : ''}>Active</option>
+                            <option value="inactive" ${emp.status === 'inactive' ? 'selected' : ''}>Inactive</option>
+                            <option value="on-leave" ${emp.status === 'on-leave' ? 'selected' : ''}>On Leave</option>
+                        </select>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-warning" onclick="editEmployee(${emp.id})">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteEmployee(${emp.id})">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+        tbody.innerHTML = html;
+        
+        // Add event listeners for status selects
+        document.querySelectorAll('.status-select').forEach(select => {
+            select.addEventListener('change', function(e) {
+                updateEmployeeStatus(this.dataset.id, this.value);
+            });
+        });
+    }
+    
+    // Update add employee button listener
+    document.getElementById('add-employee-btn').onclick = () => showEmployeeModal('add');
+}
+
+// Add Employee Modal
+function addEmployeeModal() {
+    if (document.getElementById('employeeModal')) return;
+    
+    const modalHTML = `
+        <div class="modal fade" id="employeeModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title" id="employeeModalTitle">Add Employee</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="employee-form">
+                            <input type="hidden" id="employee-id">
+                            
+                            <div class="mb-3">
+                                <label for="employee-id-number" class="form-label">Employee ID</label>
+                                <input type="text" class="form-control" id="employee-id-number" required>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="employee-user" class="form-label">User Account</label>
+                                <select class="form-select" id="employee-user" required>
+                                    <option value="">Select User</option>
+                                    ${window.db.accounts
+                                        .filter(a => a.verified)
+                                        .map(a => `<option value="${a.id}">${a.firstName} ${a.lastName} (${a.email})</option>`)
+                                        .join('')}
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="employee-position" class="form-label">Position</label>
+                                <input type="text" class="form-control" id="employee-position" required>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="employee-department" class="form-label">Department</label>
+                                <select class="form-select" id="employee-department" required>
+                                    <option value="">Select Department</option>
+                                    ${window.db.departments.map(d => 
+                                        `<option value="${d.id}">${d.name}</option>`
+                                    ).join('')}
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="employee-hire-date" class="form-label">Hire Date</label>
+                                <input type="date" class="form-control" id="employee-hire-date" required>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="employee-status" class="form-label">Status</label>
+                                <select class="form-select" id="employee-status">
+                                    <option value="active">Active</option>
+                                    <option value="inactive">Inactive</option>
+                                    <option value="on-leave">On Leave</option>
+                                </select>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" id="save-employee-btn">Save Employee</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // Add event listener
+    document.getElementById('save-employee-btn').addEventListener('click', saveEmployee);
+}
+
+// Show employee modal for add/edit
+function showEmployeeModal(action, employeeId = null) {
+    const modalTitle = document.getElementById('employeeModalTitle');
+    const form = document.getElementById('employee-form');
+    
+    if (action === 'add') {
+        modalTitle.textContent = 'Add Employee';
+        form.reset();
+        document.getElementById('employee-id').value = '';
+        
+        // Set default hire date to today
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('employee-hire-date').value = today;
+    } else {
+        modalTitle.textContent = 'Edit Employee';
+        
+        // Load employee data
+        const emp = window.db.employees.find(e => e.id === employeeId);
+        if (emp) {
+            document.getElementById('employee-id').value = emp.id;
+            document.getElementById('employee-id-number').value = emp.employeeId;
+            document.getElementById('employee-user').value = emp.userId;
+            document.getElementById('employee-position').value = emp.position;
+            document.getElementById('employee-department').value = emp.departmentId;
+            document.getElementById('employee-hire-date').value = emp.hireDate;
+            document.getElementById('employee-status').value = emp.status;
+        }
+    }
+    
+    const modal = new bootstrap.Modal(document.getElementById('employeeModal'));
+    modal.show();
+}
+
+// Save employee (add or update)
+function saveEmployee() {
+    const empId = document.getElementById('employee-id').value;
+    const employeeId = document.getElementById('employee-id-number').value.trim();
+    const userId = parseInt(document.getElementById('employee-user').value);
+    const position = document.getElementById('employee-position').value.trim();
+    const departmentId = parseInt(document.getElementById('employee-department').value);
+    const hireDate = document.getElementById('employee-hire-date').value;
+    const status = document.getElementById('employee-status').value;
+    
+    // Validate
+    if (!employeeId || !userId || !position || !departmentId || !hireDate) {
+        showNotification('Please fill in all fields', 'warning');
+        return;
+    }
+    
+    // Check if employee ID already exists
+    if (!empId && window.db.employees.some(e => e.employeeId === employeeId)) {
+        showNotification('Employee ID already exists', 'danger');
+        return;
+    }
+    
+    // Check if user already has an employee record
+    if (!empId && window.db.employees.some(e => e.userId === userId)) {
+        showNotification('This user already has an employee record', 'danger');
+        return;
+    }
+    
+    const now = new Date().toISOString();
+    
+    if (empId) {
+        // Update existing employee
+        const index = window.db.employees.findIndex(e => e.id === parseInt(empId));
+        if (index !== -1) {
+            window.db.employees[index] = {
+                ...window.db.employees[index],
+                employeeId,
+                userId,
+                position,
+                departmentId,
+                hireDate,
+                status,
+                updatedAt: now
+            };
+            showNotification('Employee updated successfully', 'success');
+        }
+    } else {
+        // Create new employee
+        const newEmp = {
+            id: generateId(),
+            employeeId,
+            userId,
+            position,
+            departmentId,
+            hireDate,
+            status,
+            createdAt: now,
+            updatedAt: now
+        };
+        
+        window.db.employees.push(newEmp);
+        showNotification('Employee created successfully', 'success');
+    }
+    
+    saveToStorage();
+    
+    // Close modal and refresh
+    bootstrap.Modal.getInstance(document.getElementById('employeeModal')).hide();
+    renderEmployeesPage();
+}
+
+// Edit employee
+function editEmployee(employeeId) {
+    showEmployeeModal('edit', parseInt(employeeId));
+}
+
+// Delete employee
+function deleteEmployee(employeeId) {
+    employeeId = parseInt(employeeId);
+    
+    if (confirm('Are you sure you want to delete this employee record?')) {
+        window.db.employees = window.db.employees.filter(e => e.id !== employeeId);
+        saveToStorage();
+        renderEmployeesPage();
+        showNotification('Employee deleted successfully', 'success');
+    }
+}
+
+// Update employee status
+function updateEmployeeStatus(employeeId, newStatus) {
+    const emp = window.db.employees.find(e => e.id === parseInt(employeeId));
+    if (emp) {
+        emp.status = newStatus;
+        emp.updatedAt = new Date().toISOString();
+        saveToStorage();
+        showNotification(`Status updated for employee ${emp.employeeId}`, 'success');
+    }
+}
+
+// ==================== REQUESTS PAGE (Placeholder) ====================
+
+function renderRequestsPage() {
+    const tbody = document.getElementById('requests-table-body');
+    
+    if (window.db.requests.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center">No requests found</td></tr>';
+    } else {
+        let html = '';
+        // Filter requests for current user if not admin
+        const requestsToShow = currentUser?.role === 'admin' 
+            ? window.db.requests 
+            : window.db.requests.filter(r => r.employeeEmail === currentUser?.email);
+        
+        requestsToShow.forEach(req => {
+            const itemsList = req.items.map(i => `${i.name} (${i.quantity})`).join(', ');
+            const statusClass = {
+                'Pending': 'warning',
+                'Approved': 'success',
+                'Rejected': 'danger'
+            }[req.status] || 'secondary';
+            
+            html += `
+                <tr>
+                    <td>${req.type}</td>
+                    <td>${itemsList}</td>
+                    <td><span class="badge bg-${statusClass}">${req.status}</span></td>
+                    <td>${new Date(req.createdAt).toLocaleDateString()}</td>
+                </tr>
+            `;
+        });
+        tbody.innerHTML = html || '<tr><td colspan="4" class="text-center">No requests found</td></tr>';
+    }
+}
+
+function renderVerifyEmailPage() {
+    const unverifiedEmail = localStorage.getItem('unverified_email');
+    if (unverifiedEmail) {
+        document.getElementById('unverified-email').textContent = unverifiedEmail;
+        document.getElementById('verify-email-message').className = 'alert alert-info';
+        document.getElementById('verify-email-message').innerHTML = 
+            `Verification sent to <strong>${unverifiedEmail}</strong>`;
+    } else {
+        document.getElementById('verify-email-message').className = 'alert alert-warning';
+        document.getElementById('verify-email-message').innerHTML = 
+            'No pending verification found. Please <a href="#/register">register</a> first.';
+    }
+}
+
+// ==================== UTILITY FUNCTIONS ====================
+
+// Setup navigation links to use client-side routing
+function setupNavigationLinks() {
+    document.addEventListener('click', function(e) {
+        // Check if clicked element is a navigation link
+        const link = e.target.closest('a');
+        if (!link) return;
+        
+        const href = link.getAttribute('href');
+        
+        // Handle internal navigation links (starting with #/)
+        if (href && href.startsWith('#/')) {
+            e.preventDefault();
+            navigateTo(href.slice(1)); // Remove the '#' and navigate
+        }
+        
+        // Handle logout link
+        if (link.id === 'logout-btn') {
+            e.preventDefault();
+            handleLogout();
+        }
+    });
+}
+
+// Show notification with optional duration
+function showNotification(message, type = 'info', duration = 3000) {
+    // Create toast container if it doesn't exist
+    let toastContainer = document.querySelector('.toast-container');
+    if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.className = 'toast-container';
+        document.body.appendChild(toastContainer);
+    }
+    
+    // Create toast
+    const toastId = 'toast-' + Date.now();
+    const toast = document.createElement('div');
+    toast.className = `toast show align-items-center text-white bg-${type} border-0`;
+    toast.id = toastId;
+    toast.setAttribute('role', 'alert');
+    toast.setAttribute('aria-live', 'assertive');
+    toast.setAttribute('aria-atomic', 'true');
+    
+    toast.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body">
+                ${message}
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    `;
+    
+    toastContainer.appendChild(toast);
+    
+    // Auto-remove after duration
+    setTimeout(() => {
+        toast.remove();
+    }, duration);
+}
+
+// Setup form listeners
+function setupFormListeners() {
+    // Register form
+    const registerForm = document.getElementById('register-form');
+    if (registerForm) {
+        registerForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            handleRegister();
+        });
+    }
+    
+    // Login form
+    const loginForm = document.getElementById('login-form');
+    if (loginForm) {
+        loginForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            handleLogin();
+        });
+    }
+    
+    // Simulate verify button
+    const verifyBtn = document.getElementById('simulate-verify-btn');
+    if (verifyBtn) {
+        verifyBtn.addEventListener('click', function() {
+            simulateVerification();
+        });
+    }
+    
+    // New request button (for Phase 7)
+    const newRequestBtn = document.getElementById('new-request-btn');
+    if (newRequestBtn) {
+        newRequestBtn.addEventListener('click', function() {
+            showNotification('New request functionality coming in Phase 7!', 'info');
+        });
+    }
+}
+
+// Handle registration
+function handleRegister() {
+    const firstName = document.getElementById('first-name').value.trim();
+    const lastName = document.getElementById('last-name').value.trim();
+    const email = document.getElementById('register-email').value.trim();
+    const password = document.getElementById('register-password').value;
+    
+    // Validate inputs
+    if (!firstName || !lastName || !email || !password) {
+        showNotification('Please fill in all fields', 'warning');
+        return;
+    }
+    
+    if (password.length < 6) {
+        showNotification('Password must be at least 6 characters', 'warning');
+        return;
+    }
+    
+    if (!isValidEmail(email)) {
+        showNotification('Please enter a valid email address', 'warning');
+        return;
+    }
+    
+    // Check if email already exists
+    const existingUser = window.db.accounts.find(acc => acc.email.toLowerCase() === email.toLowerCase());
+    
+    if (existingUser) {
+        showNotification('Email already registered!', 'danger');
+        return;
+    }
+    
+    // Create new account (always as user for security)
+    const newAccount = {
+        id: generateId(),
+        firstName,
+        lastName,
+        email: email.toLowerCase(),
+        password: password,
+        role: 'user',
+        verified: false,
+        createdAt: new Date().toISOString(),
+        lastLogin: null,
+        phone: '',
+        department: '',
+        position: '',
+        bio: ''
+    };
+    
+    window.db.accounts.push(newAccount);
+    saveToStorage();
+    
+    // Store email for verification
+    localStorage.setItem('unverified_email', email.toLowerCase());
+    
+    // Clear form
+    document.getElementById('register-form').reset();
+    
+    showNotification('Registration successful! Please verify your email.', 'success');
+    
+    // Navigate to verify email page
+    navigateTo('/verify-email');
+    
+    console.log('Registration successful:', email);
+}
+
+// Validate email format
+function isValidEmail(email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+}
+
+// Generate simple ID
+function generateId() {
+    return Date.now() + Math.floor(Math.random() * 1000);
+}
+
+// Simulate email verification
+function simulateVerification() {
+    const unverifiedEmail = localStorage.getItem('unverified_email');
+    
+    if (!unverifiedEmail) {
+        showNotification('No unverified email found!', 'warning');
+        return;
+    }
+    
+    const account = window.db.accounts.find(acc => acc.email === unverifiedEmail);
+    
+    if (account) {
+        if (account.verified) {
+            showNotification('This account is already verified!', 'info');
+            localStorage.removeItem('unverified_email');
+            navigateTo('/login');
+            return;
+        }
+        
+        account.verified = true;
+        saveToStorage();
+        localStorage.removeItem('unverified_email');
+        
+        showNotification('Email verified successfully! You can now login.', 'success');
+        navigateTo('/login');
+    } else {
+        showNotification('Account not found!', 'danger');
+        localStorage.removeItem('unverified_email');
+    }
+}
+
+// Handle login
+function handleLogin() {
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value;
+    
+    if (!email || !password) {
+        showNotification('Please fill in all fields', 'warning');
+        return;
+    }
+    
+    // Find account with matching email, password, and verified status
+    const account = window.db.accounts.find(acc => 
+        acc.email.toLowerCase() === email.toLowerCase() && 
+        acc.password === password
+    );
+    
+    if (!account) {
+        showNotification('Invalid email or password!', 'danger');
+        return;
+    }
+    
+    if (!account.verified) {
+        showNotification('Please verify your email before logging in.', 'warning');
+        localStorage.setItem('unverified_email', account.email);
+        navigateTo('/verify-email');
+        return;
+    }
+    
+    // Update last login
+    account.lastLogin = new Date().toISOString();
+    saveToStorage();
+    
+    // Set auth state
+    setAuthState(true, account);
+    
+    // Save to localStorage
+    localStorage.setItem('auth_token', account.email);
+    
+    // Clear login form
+    document.getElementById('login-form').reset();
+    
+    showNotification(`Welcome back, ${account.firstName}!`, 'success');
+    
+    // Navigate to profile
+    navigateTo('/profile');
+    
+    console.log('Login successful:', email);
+}
+
+// Handle logout
+function handleLogout() {
+    // Clear auth state
+    setAuthState(false, null);
+    
+    // Remove from localStorage
+    localStorage.removeItem('auth_token');
+    
+    showNotification('Logged out successfully', 'info');
+    
+    // Navigate to home
+    navigateTo('/');
+    
+    console.log('Logout successful');
+}
+
+// Set authentication state
+function setAuthState(isAuth, user) {
+    currentUser = user;
+    
+    const body = document.body;
+    
+    if (isAuth && user) {
+        body.classList.remove('not-authenticated');
+        body.classList.add('authenticated');
+        
+        // Update username display
+        const usernameDisplay = document.getElementById('username-display');
+        if (usernameDisplay) {
+            usernameDisplay.textContent = `${user.firstName} ${user.lastName}`;
+        }
+        
+        // Check if admin
+        if (user.role === 'admin') {
+            body.classList.add('is-admin');
+        } else {
+            body.classList.remove('is-admin');
+        }
+        
+        // Update profile page if it's visible
+        if (document.getElementById('profile-page').classList.contains('active')) {
+            renderProfilePage();
+        }
+    } else {
+        body.classList.add('not-authenticated');
+        body.classList.remove('authenticated', 'is-admin');
+        
+        // Clear username display
+        const usernameDisplay = document.getElementById('username-display');
+        if (usernameDisplay) {
+            usernameDisplay.textContent = 'User';
+        }
+    }
+}
+
+// Check for existing session on load
+function checkExistingSession() {
+    const token = localStorage.getItem('auth_token');
+    
+    if (token) {
+        const account = window.db.accounts.find(acc => acc.email === token);
+        if (account && account.verified) {
+            setAuthState(true, account);
+            console.log('Session restored for:', account.email);
+        } else {
+            // Clear invalid token
+            localStorage.removeItem('auth_token');
+        }
+    }
+}
+
+// Log storage status
+function logStorageStatus() {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+        const size = new Blob([stored]).size;
+        console.log(`📊 Storage status: ${formatBytes(size)} used`);
+    }
+}
+
+// Format bytes
+function formatBytes(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// Make functions available globally for onclick handlers
+window.editDepartment = editDepartment;
+window.deleteDepartment = deleteDepartment;
+window.editAccount = editAccount;
+window.deleteAccount = deleteAccount;
+window.resetPassword = resetPassword;
+window.editEmployee = editEmployee;
+window.deleteEmployee = deleteEmployee;
