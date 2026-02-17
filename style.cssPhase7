@@ -1,0 +1,210 @@
+
+/* Page visibility control */
+.page {
+    display: none;
+}
+
+.page.active {
+    display: block;
+}
+
+/* Role-based visibility */
+body.not-authenticated .role-logged-in {
+    display: none !important;
+}
+
+body.authenticated .role-logged-out {
+    display: none !important;
+}
+
+.role-admin {
+    display: none !important;
+}
+
+body.is-admin .role-admin {
+    display: block !important;
+}
+
+/* Dropdown items need special handling */
+body.is-admin .dropdown-item.role-admin {
+    display: block !important;
+}
+
+/* Nav items need inline-block for proper layout */
+body.is-admin .nav-item.role-admin {
+    display: inline-block !important;
+}
+
+/* Custom styles */
+.card {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+    transition: transform 0.2s;
+}
+
+.card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.jumbotron {
+    padding: 2rem;
+    background-color: #f8f9fa;
+    border-radius: 0.3rem;
+    margin-bottom: 2rem;
+}
+
+/* Table responsiveness */
+.table-responsive {
+    margin-top: 1rem;
+}
+
+.table td, .table th {
+    vertical-align: middle;
+}
+
+/* Loading overlay */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.8);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+
+.loading-overlay .spinner-container {
+    text-align: center;
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.2);
+}
+
+/* Toast notifications */
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+}
+
+.toast {
+    min-width: 250px;
+    margin-bottom: 10px;
+    animation: slideIn 0.3s ease-in-out;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Form validation styles */
+.form-control.is-invalid {
+    border-color: #dc3545;
+}
+
+.invalid-feedback {
+    display: none;
+    color: #dc3545;
+    font-size: 0.875rem;
+}
+
+.form-control.is-invalid + .invalid-feedback {
+    display: block;
+}
+
+/* Avatar circle */
+.avatar-circle {
+    width: 100px;
+    height: 100px;
+    background-color: #007bff;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 0 auto;
+}
+
+.avatar-initials {
+    color: white;
+    font-size: 36px;
+    font-weight: bold;
+}
+
+/* Hover effects */
+.btn {
+    transition: all 0.2s;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+/* List group hover */
+.list-group-item-action {
+    transition: background-color 0.2s;
+}
+
+.list-group-item-action:hover {
+    background-color: #f8f9fa;
+}
+
+/* Badge styles */
+.badge {
+    padding: 0.5em 0.8em;
+    font-weight: 500;
+}
+
+/* Modal animations */
+.modal.fade .modal-dialog {
+    transition: transform 0.3s ease-out;
+    transform: scale(0.95);
+}
+
+.modal.show .modal-dialog {
+    transform: scale(1);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .avatar-circle {
+        width: 80px;
+        height: 80px;
+    }
+    
+    .avatar-initials {
+        font-size: 28px;
+    }
+    
+    .table {
+        font-size: 0.9rem;
+    }
+    
+    .btn-sm {
+        padding: 0.25rem 0.4rem;
+    }
+}
+
+/* Print styles */
+@media print {
+    .navbar, .btn, .toast-container, .modal {
+        display: none !important;
+    }
+    
+    .card {
+        box-shadow: none;
+        border: 1px solid #ddd;
+    }
+}
